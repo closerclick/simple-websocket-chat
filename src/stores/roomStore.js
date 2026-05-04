@@ -821,6 +821,16 @@ export const useRoomStore = defineStore('room', () => {
 
   const listPublicRooms = async () => {
     try {
+      // Race: el componente se monta antes de que el WS termine el handshake.
+      // Esperamos hasta 3 s a que el cliente esté conectado; si no lo está,
+      // hacemos no-op silencioso (el polling de 3 s lo intentará de nuevo).
+      if (!connectionStore.wsProxyClient.isConnected) {
+        const start = Date.now()
+        while (!connectionStore.wsProxyClient.isConnected && Date.now() - start < 3000) {
+          await new Promise(r => setTimeout(r, 100))
+        }
+        if (!connectionStore.wsProxyClient.isConnected) return
+      }
       const channels = await connectionStore.wsProxyClient.listChannels({ prefix: ROOM_CHANNEL_PREFIX })
 
       // Mapa nombre-de-sala → count desde el servidor
