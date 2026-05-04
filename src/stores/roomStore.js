@@ -453,6 +453,16 @@ export const useRoomStore = defineStore('room', () => {
     const id = await getIdentity()
     if (!id) throw new Error('Identity vault not available')
     const updated = await id.setRating(pubkey, rating, notes)
+    // Save rated peer in the shared contact book (id.closer.click ≥ 0.6.0).
+    try {
+      const m = members.value.find(x => x.pubkey === pubkey)
+      await id.addContact({
+        publickey: pubkey,
+        nickname: m?.nickname || undefined,
+        encryptionPubkey: m?.encryptionPubkey || undefined,
+        lastToken: m?.token || undefined
+      })
+    } catch (_) {}
     for (const m of members.value) {
       if (m.pubkey === pubkey) m.peer = updated
     }
