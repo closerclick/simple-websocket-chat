@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/simple-websocket-chat/',
+  base: './',
   server: {
     port: 5174,
     open: true
