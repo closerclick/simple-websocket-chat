@@ -1,5 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+
+// El servicio del store carga un iframe (store.closer.click) que no aplica en
+// tests unitarios: lo mockeamos como no-op para no tocar la red ni colgar.
+vi.mock('../src/services/store.js', () => ({
+  loadHistory: vi.fn().mockResolvedValue([]),
+  persistMessage: vi.fn(),
+  clearHistory: vi.fn(),
+  getStore: vi.fn().mockResolvedValue(null)
+}))
+
 import { useRoomStore } from '../src/stores/roomStore.js'
 import { useConnectionStore } from '../src/stores/connectionStore.js'
 
@@ -12,6 +22,7 @@ function setupStores({ token = 'ME01', nickname = 'me' } = {}) {
   connection.isConnected = true
   connection.sendMessage = vi.fn().mockResolvedValue()
   connection.wsProxyClient = {
+    isConnected: true,
     publish: vi.fn().mockResolvedValue(),
     unpublish: vi.fn().mockResolvedValue(),
     listChannel: vi.fn().mockResolvedValue([]),

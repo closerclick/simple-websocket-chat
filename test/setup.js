@@ -9,3 +9,22 @@ if (typeof globalThis.WebSocket === 'undefined') {
     CLOSED: 3
   }
 }
+
+// happy-dom no siempre expone un `localStorage` funcional en este entorno
+// (los stores leen `localStorage.getItem` al inicializar). Polyfill en memoria
+// si falta o no es funcional, suficiente para los tests unitarios.
+if (typeof globalThis.localStorage === 'undefined' || typeof globalThis.localStorage.getItem !== 'function') {
+  const mem = new Map()
+  const storage = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => { mem.set(String(k), String(v)) },
+    removeItem: (k) => { mem.delete(k) },
+    clear: () => { mem.clear() },
+    key: (i) => [...mem.keys()][i] ?? null,
+    get length () { return mem.size }
+  }
+  Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true, writable: true })
+  if (globalThis.window) {
+    try { Object.defineProperty(globalThis.window, 'localStorage', { value: storage, configurable: true, writable: true }) } catch { /* */ }
+  }
+}

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Identity } from '@gatoseya/closer-click-identity'
 import { useConnectionStore } from './connectionStore'
 import { sanitizeMessage, sanitizeNickname } from '../utils/sanitize'
+import { loadHistory, persistMessage } from '../services/store'
 
 let _identity = null
 let _identityReadyHooks = []
@@ -84,6 +85,25 @@ export const useRoomStore = defineStore('room', () => {
 
       currentRoom.value = roomName
       messages.value = []
+
+      // Restaurar historial local persistido (best-effort; si el store no está,
+      // arranca vacío como antes). Se carga antes del aviso "You joined".
+      try {
+        const history = await loadHistory(roomName)
+        if (currentRoom.value === roomName && history.length) {
+          messages.value.push(...history.map(h => ({
+            id: h.id || crypto.randomUUID(),
+            from: h.from,
+            nickname: h.nickname,
+            type: 'chat',
+            text: h.text,
+            timestamp: h.ts || h.timestamp || Date.now(),
+            isMe: !!h.isMe,
+            historic: true
+          })))
+        }
+      } catch (_) { /* sin historial, seguimos */ }
+
       members.value = [
         {
           token: connectionStore.token,
@@ -248,7 +268,7 @@ export const useRoomStore = defineStore('room', () => {
       await connectionStore.sendMessage(recipients.map(r => r.token), msg)
 
       // Echo local (el remitente nunca cifra para sí mismo)
-      messages.value.push({
+      const echo = {
         id: crypto.randomUUID(),
         from: connectionStore.token,
         nickname: connectionStore.nickname,
@@ -256,7 +276,9 @@ export const useRoomStore = defineStore('room', () => {
         text: trimmed,
         timestamp: Date.now(),
         isMe: true
-      })
+      }
+      messages.value.push(echo)
+      persistMessage(currentRoom.value, echo)
 
     } catch (error) {
       console.error('Send message error:', error)
@@ -523,7 +545,7 @@ export const useRoomStore = defineStore('room', () => {
       })
     }
 
-    messages.value.push({
+    const incoming = {
       id: crypto.randomUUID(),
       from: fromToken,
       nickname: sanitizedNickname || (member?.nickname || fromToken),
@@ -531,7 +553,9 @@ export const useRoomStore = defineStore('room', () => {
       text: sanitizedText,
       timestamp: payload.timestamp || Date.now(),
       isMe: false
-    })
+    }
+    messages.value.push(incoming)
+    persistMessage(currentRoom.value, incoming)
   }
 
   const handleChatMessage = (fromToken, payload) => {
@@ -555,7 +579,7 @@ export const useRoomStore = defineStore('room', () => {
     }
 
     // Add message
-    messages.value.push({
+    const legacyMsg = {
       id: crypto.randomUUID(),
       from: fromToken,
       nickname: sanitizedNickname,
@@ -563,7 +587,9 @@ export const useRoomStore = defineStore('room', () => {
       text: sanitizedText,
       timestamp: payload.timestamp || Date.now(),
       isMe: false
-    })
+    }
+    messages.value.push(legacyMsg)
+    persistMessage(currentRoom.value, legacyMsg)
   }
 
   const handleJoinAnnounce = (fromToken, payload) => {
