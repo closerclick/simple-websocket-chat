@@ -8,6 +8,7 @@
     <meta name="description" content="Chat en tiempo real con salas públicas, descubrimiento de canales y mensajería P2P por WebRTC con caída automática al proxy." />
     <link rel="canonical" href="https://chat.closer.click/" />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_ES" />
     <meta property="og:site_name" content="Closer Click" />
     <meta property="og:title" content="Closer Click Chat" />
     <meta property="og:description" content="Chat en tiempo real con salas públicas y mensajería P2P por WebRTC." />
@@ -22,7 +23,20 @@
     <!-- Analítica cookieless autohosteada (GoatCounter); no cuenta en localhost/LAN. -->
     <script>window.goatcounter={path:function(p){return location.hostname+p}}</script>
     <script data-goatcounter="https://goat.closer.click/count" async src="https://goat.closer.click/count.js"></script>
-  </head>
+      <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Closer Click Chat",
+      "url": "https://chat.closer.click/",
+      "description": "Chat en tiempo real con salas públicas y mensajería P2P por WebRTC.",
+      "applicationCategory": "CommunicationApplication",
+      "operatingSystem": "Web",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "publisher": { "@type": "Organization", "name": "Closer Click", "url": "https://closer.click/" }
+    }
+    </script>
+</head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
