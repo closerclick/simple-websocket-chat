@@ -33,6 +33,8 @@
       >
         Reconnect
       </button>
+
+      <closer-click-support href="https://ko-fi.com/seyacat"></closer-click-support>
     </div>
 
     <UserSettingsModal
