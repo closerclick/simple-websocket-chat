@@ -23,7 +23,7 @@ El eje del ecosistema **[CloserClick](https://closer.click)** es el **autohosteo
 
 Aplicación de chat multi-sala P2P-mesh sobre el proxy WebSocket de Closer Click. Vue 3 + Vite + Pinia.
 
-🌐 Producción: **https://seyacat.github.io/simple-websocket-chat/**
+🌐 Producción: **https://closerclick.github.io/simple-websocket-chat/**
 
 ## Características
 

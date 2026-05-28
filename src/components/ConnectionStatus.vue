@@ -34,7 +34,7 @@
         Reconnect
       </button>
 
-      <closer-click-support href="https://ko-fi.com/closerclick" repo="seyacat/simple-websocket-chat" discord="https://discord.gg/D648uq7cth"></closer-click-support>
+      <closer-click-support href="https://ko-fi.com/closerclick" repo="closerclick/simple-websocket-chat" discord="https://discord.gg/D648uq7cth"></closer-click-support>
     </div>
 
     <UserSettingsModal
