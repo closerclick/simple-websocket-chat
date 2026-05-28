@@ -1,5 +1,5 @@
 // Persistencia del historial local del chat usando el store estándar del
-// ecosistema (`@gatoseya/closer-click-store` ≥ 0.3.0, IndexedDB en
+// ecosistema (`@closerclick/closer-click-store` ≥ 0.3.0, IndexedDB en
 // `store.closer.click`). Es un almacén de THREADS de mensajes: cada sala es un
 // thread (`chat:<sala>`) y cada mensaje propio/recibido (ya en claro en este
 // cliente) se guarda como una entrada.
@@ -8,7 +8,7 @@
 // servidor guarda historial; esto solo persiste TU vista local en TU navegador
 // (no se sincroniza salvo que actives el sync a tu Drive en el vault del store).
 
-import { Store } from '@gatoseya/closer-click-store'
+import { Store } from '@closerclick/closer-click-store'
 
 let _storePromise = null
 

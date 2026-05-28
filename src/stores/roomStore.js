@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { Identity } from '@gatoseya/closer-click-identity'
+import { Identity } from '@closerclick/closer-click-identity'
 import { useConnectionStore } from './connectionStore'
 import { sanitizeMessage, sanitizeNickname } from '../utils/sanitize'
 import { loadHistory, persistMessage } from '../services/store'

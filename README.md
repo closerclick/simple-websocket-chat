@@ -41,8 +41,8 @@ Aplicación de chat multi-sala P2P-mesh sobre el proxy WebSocket de Closer Click
 
 ```jsonc
 {
-  "@gatoseya/closer-click-proxy-client": "^0.2.0",
-  "@gatoseya/closer-click-identity":     "^0.5.0",
+  "@closerclick/closer-click-proxy-client": "^0.2.0",
+  "@closerclick/closer-click-identity":     "^0.5.0",
   "vue": "^3", "pinia": "^3"
 }
 ```
