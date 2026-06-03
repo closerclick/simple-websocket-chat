@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { Identity } from '@closerclick/closer-click-identity'
+import { createVaultReputation } from '@closerclick/closer-click-reputation'
 import { useConnectionStore } from './connectionStore'
 import { sanitizeMessage, sanitizeNickname } from '../utils/sanitize'
 import { loadHistory, persistMessage } from '../services/store'
@@ -20,6 +21,17 @@ async function getIdentity () {
     _identity = null
   }
   return _identity
+}
+
+// Registro de reputación compartido (reputation.closer.click), sobre el mismo
+// vault. Singleton. Habilita el panel "Reputación de la red" del perfil.
+let _reputation = null
+async function getReputation () {
+  if (_reputation) return _reputation
+  const id = await getIdentity()
+  if (!id) return null
+  try { _reputation = createVaultReputation(id) } catch (_) { _reputation = null }
+  return _reputation
 }
 
 export const useRoomStore = defineStore('room', () => {
@@ -911,6 +923,7 @@ export const useRoomStore = defineStore('room', () => {
     listPublicRooms,
     ratePeer,
     setPeerNickname,
+    getReputation,
     refreshPeerInfo,
     refreshTrustMap,
     trustMap

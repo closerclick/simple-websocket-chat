@@ -11,81 +11,35 @@
       </div>
 
       <template v-else>
+        <!-- Nickname personalizado (propio del chat: sobrescribe el público) -->
         <div class="row">
           <label>Nickname personalizado</label>
-          <input
-            v-model="customNickname"
-            type="text"
-            maxlength="40"
-            placeholder="Sobrescribe el nickname público"
-          />
+          <input v-model="customNickname" type="text" maxlength="40"
+                 placeholder="Sobrescribe el nickname público" />
         </div>
 
-        <div class="row">
-          <label>Calificación</label>
-          <div class="stars">
-            <button
-              v-for="n in 5"
-              :key="n"
-              type="button"
-              class="star"
-              :class="{ active: n <= rating }"
-              @click="rating = n"
-              :aria-label="`${n} ${n === 1 ? 'estrella' : 'estrellas'}`"
-            >★</button>
-            <button
-              type="button"
-              class="clear"
-              @click="rating = 0"
-              v-if="rating > 0"
-            >limpiar</button>
-          </div>
-        </div>
-
-        <div class="row">
-          <label>Notas</label>
-          <textarea
-            v-model="notes"
-            rows="3"
-            maxlength="500"
-            placeholder="Anotaciones privadas (no se comparten)"
-          ></textarea>
-        </div>
-
-        <div class="actions">
-          <button class="primary" @click="save" :disabled="saving">
-            {{ saving ? 'Guardando…' : 'Guardar' }}
-          </button>
-        </div>
-
-        <div v-if="endorsements.length > 0" class="endorsements">
-          <h4>Opiniones de personas que tú calificas</h4>
-          <ul>
-            <li v-for="e in endorsements" :key="e.ratedBy">
-              <span class="endorsement-rating">★ {{ e.rating }}</span>
-              <span class="endorsement-from">de {{ endorserName(e.ratedBy) }}</span>
-              <span v-if="e.notes" class="endorsement-notes">— {{ e.notes }}</span>
-            </li>
-          </ul>
-        </div>
+        <!-- Tarjeta de perfil + reputación compartida del ecosistema -->
+        <closer-click-profile
+          ref="profileEl"
+          mode="edit"
+          :style="profileTheme"
+          :pubkey="member.pubkey"
+          :name="displayName"
+        ></closer-click-profile>
 
         <div v-if="suspicion" class="suspicion">
           ⚠ Te ha consultado por {{ suspicion.queriesMade }} personas; conocías
           {{ suspicion.queriesKnown }}.
         </div>
-
-        <details class="raw">
-          <summary>Pubkey</summary>
-          <pre>{{ shortPubkey }}</pre>
-        </details>
       </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useRoomStore } from '../stores/roomStore'
+import '@closerclick/closer-click-profile'
 
 const props = defineProps({
   member: { type: Object, default: null }
@@ -94,17 +48,10 @@ const emit = defineEmits(['close'])
 
 const roomStore = useRoomStore()
 
-const rating = ref(0)
-const notes = ref('')
 const customNickname = ref('')
-const saving = ref(false)
+const profileEl = ref(null)
 
-const endorsements = computed(() => {
-  const list = props.member?.peer?.endorsements
-  if (!Array.isArray(list)) return []
-  // Solo opiniones de personas que yo he calificado (peso > 0)
-  return list.filter(e => roomStore.trustMap.has(e.ratedBy))
-})
+const displayName = computed(() => props.member?.peer?.nickname || props.member?.nickname || '')
 
 const suspicion = computed(() => {
   const stats = props.member?.peer?.queryStats
@@ -115,112 +62,108 @@ const suspicion = computed(() => {
   return stats
 })
 
-const endorserName = (pubkey) => {
-  // Buscar entre los miembros visibles para tomar su nickname
-  const m = roomStore.members.find(x => x.pubkey === pubkey)
-  if (m) return m.peer?.nickname || m.nickname
-  // Fallback: pubkey corta
-  if (pubkey.length > 32) return pubkey.slice(0, 12) + '…'
-  return pubkey
+// Tema del chat (claro/oscuro adaptativo vía sus --color-*).
+const profileTheme = {
+  '--ccp-bg': 'var(--color-card-bg)',
+  '--ccp-bg-2': 'var(--color-surface)',
+  '--ccp-bg-3': 'var(--color-surface-variant)',
+  '--ccp-bg-4': 'var(--color-border-light)',
+  '--ccp-border': 'var(--color-border)',
+  '--ccp-text': 'var(--color-text)',
+  '--ccp-muted': 'var(--color-text-secondary)',
+  '--ccp-accent': 'var(--color-primary)',
+  '--ccp-accent-2': 'var(--color-primary-dark)',
+  '--ccp-derived': '#d49a00',
+  '--ccp-gold': '#f5b301',
+  '--ccp-online': 'var(--color-success)',
+  '--ccp-affinity': 'var(--color-secondary)',
+  '--ccp-input-bg': 'var(--color-background)',
+  '--ccp-radius': '10px',
 }
 
-const displayName = computed(() => {
-  return props.member?.peer?.nickname || props.member?.nickname || ''
-})
+// Provider: datos locales del vault (instantáneos) + reputación de la nube.
+// El rate pasa por roomStore.ratePeer (mantiene su bookkeeping: trustMap,
+// badges del MemberList) y además publica la atestación firmada al registro.
+const provider = {
+  async getMyRating () {
+    const peer = props.member?.peer
+    return {
+      confianza: peer?.myRating?.rating || peer?.rating || 0,
+      afinidad: 0,
+      notes: peer?.myRating?.notes || peer?.notes || ''
+    }
+  },
+  async getEndorsements () {
+    const list = (props.member?.peer?.endorsements || [])
+      .filter(e => roomStore.trustMap.has(e.ratedBy))
+      .map(e => ({ ratedBy: e.ratedBy, rating: e.rating, issuedAt: e.issuedAt || e.ts }))
+    const vals = list.map(e => e.rating).filter(n => typeof n === 'number')
+    return { endorsements: list, derived: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null }
+  },
+  async getCloudReputation () {
+    const rep = await roomStore.getReputation()
+    if (!rep || !props.member?.pubkey) return null
+    try { return await rep.reputationOf(props.member.pubkey) } catch (_) { return null }
+  },
+  async rate (pubkey, indicators, notes) {
+    const nick = customNickname.value.trim()
+    if (nick) { try { await roomStore.setPeerNickname(pubkey, nick) } catch (_) {} }
+    await roomStore.ratePeer(pubkey, indicators.confianza, notes || undefined)
+    const rep = await roomStore.getReputation()
+    if (rep) {
+      try { await rep.client.publishRating({ subject: pubkey, indicators, notes: notes || undefined }) } catch (_) {}
+    }
+  },
+}
 
-const shortPubkey = computed(() => {
-  if (!props.member?.pubkey) return ''
-  const k = props.member.pubkey
-  return k.length > 80 ? k.slice(0, 40) + '…' + k.slice(-20) : k
+const onRated = () => emit('close')
+
+function bindEl (el) {
+  if (!el) return
+  el.provider = provider
+  el.addEventListener('cc-profile-rate', onRated)
+}
+
+watch(profileEl, (el, prev) => {
+  if (prev) prev.removeEventListener('cc-profile-rate', onRated)
+  bindEl(el)
 })
 
 watch(() => props.member, (m) => {
-  if (m?.peer) {
-    rating.value = m.peer.rating || 0
-    notes.value = m.peer.notes || ''
-    customNickname.value = m.peer.nickname || ''
-  } else {
-    rating.value = 0
-    notes.value = ''
-    customNickname.value = ''
-  }
+  customNickname.value = m?.peer?.nickname || ''
+  if (profileEl.value) profileEl.value.reload()
 }, { immediate: true })
 
-const save = async () => {
-  if (!props.member?.pubkey) return
-  saving.value = true
-  try {
-    if (customNickname.value.trim()) {
-      await roomStore.setPeerNickname(props.member.pubkey, customNickname.value.trim())
-    }
-    await roomStore.ratePeer(props.member.pubkey, rating.value, notes.value || undefined)
-    emit('close')
-  } catch (e) {
-    console.error(e)
-    alert('No se pudo guardar: ' + (e.message || e))
-  } finally {
-    saving.value = false
-  }
-}
+onBeforeUnmount(() => {
+  if (profileEl.value) profileEl.value.removeEventListener('cc-profile-rate', onRated)
+})
 </script>
 
 <style scoped>
 .modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.55);
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
   display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
-  padding: var(--spacing-md);
+  z-index: 1000; padding: 1rem;
 }
 .modal {
-  background: var(--color-card-bg);
-  color: var(--color-text);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-lg);
-  width: 100%; max-width: 420px;
-  box-shadow: var(--shadow-lg);
-  position: relative;
+  background: var(--color-card-bg); color: var(--color-text);
+  border-radius: 10px; padding: 1.25rem;
+  width: 100%; max-width: 460px; box-shadow: var(--shadow-lg);
+  position: relative; max-height: 90vh; overflow-y: auto;
 }
 .close-btn {
   position: absolute; top: 0.5rem; right: 0.5rem;
   background: transparent; border: none; font-size: 1.5rem;
   color: var(--color-text-secondary); cursor: pointer; padding: 0.25rem 0.5rem;
 }
-.close-btn:hover { color: var(--color-text); }
 .modal-title { margin: 0 0 0.25rem; }
-.modal-token { color: var(--color-text-secondary); font-size: 0.9em; margin-bottom: var(--spacing-md); }
+.modal-token { color: var(--color-text-secondary); font-size: 0.9em; margin-bottom: 1rem; }
 .muted { color: var(--color-text-secondary); font-style: italic; }
-.row { margin-bottom: var(--spacing-md); display: flex; flex-direction: column; gap: 0.35rem; }
+.row { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .row label { font-size: 0.85em; color: var(--color-text-secondary); }
-input, textarea { font-size: 16px; }
-.stars { display: flex; align-items: center; gap: 0.25rem; }
-.star {
-  background: transparent; border: none; cursor: pointer;
-  font-size: 1.6rem; color: var(--color-border-dark, #999); padding: 0;
-}
-.star.active { color: #f5b301; }
-.clear {
-  margin-left: auto; background: transparent; border: 1px solid var(--color-border);
-  font-size: 0.75em; padding: 0.25rem 0.5rem; border-radius: var(--border-radius-sm);
-  color: var(--color-text-secondary); cursor: pointer;
-}
-.actions { display: flex; justify-content: flex-end; gap: var(--spacing-sm); }
-.actions button { padding: 0.5rem 1.2rem; }
-.raw { margin-top: var(--spacing-md); color: var(--color-text-secondary); font-size: 0.8em; }
-.raw pre { white-space: pre-wrap; word-break: break-all; background: var(--color-surface-variant); padding: 0.5rem; border-radius: var(--border-radius-sm); }
-
-.endorsements { margin: var(--spacing-md) 0; border-top: 1px solid var(--color-border); padding-top: var(--spacing-md); }
-.endorsements h4 { margin: 0 0 var(--spacing-sm); font-size: 0.95em; color: var(--color-text-secondary); }
-.endorsements ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9em; }
-.endorsement-rating { color: #d49a00; font-weight: 600; margin-right: 0.4rem; }
-.endorsement-from { color: var(--color-text); }
-.endorsement-notes { color: var(--color-text-secondary); }
+input { font-size: 16px; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: 4px; font-family: inherit; }
 .suspicion {
-  margin-top: var(--spacing-md);
-  padding: 0.6rem;
-  border-radius: var(--border-radius-sm);
-  background: rgba(220, 53, 69, 0.12);
-  color: #c0392b;
-  font-size: 0.85em;
+  margin-top: 1rem; padding: 0.6rem; border-radius: 4px;
+  background: rgba(220, 53, 69, 0.12); color: #c0392b; font-size: 0.85em;
 }
 </style>
