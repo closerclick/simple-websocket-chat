@@ -65,6 +65,7 @@ export const useConnectionStore = defineStore('connection', () => {
     const clean = sanitizeNickname((name || '').trim())
     if (!clean) throw new Error('Nickname vacío')
     const id = await Identity.connect()
+    try { await id?.ready?.() } catch (_) {}
     if (!id?.setMyNickname) throw new Error('Vault de identidad no disponible')
     await id.setMyNickname(clean)
     nickname.value = sanitizeNickname(id.me?.nickname || clean)
@@ -76,6 +77,10 @@ export const useConnectionStore = defineStore('connection', () => {
   const hydrateNicknameFromVault = async () => {
     try {
       const id = await Identity.connect()
+      // Garantizar que el handshake con el vault terminó antes de leer `me`:
+      // si otro caller creó el singleton, connect() puede devolverlo con `me`
+      // aún en null (carrera). ready() es idempotente.
+      try { await id?.ready?.() } catch (_) {}
       let vaultNick = sanitizeNickname(id?.me?.nickname || '')
       if (!vaultNick) {
         // Migración única: el chat viejo guardaba el nick solo en
