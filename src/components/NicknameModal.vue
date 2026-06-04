@@ -10,12 +10,15 @@
         placeholder="Nickname (3-20 chars)"
         maxlength="20"
         @keyup.enter="submit"
+        :disabled="saving"
         class="nickname-input"
       />
 
       <p v-if="error" class="error">{{ error }}</p>
 
-      <button @click="submit" class="primary">Join Chat</button>
+      <button @click="submit" class="primary" :disabled="saving">
+        {{ saving ? 'Saving…' : 'Join Chat' }}
+      </button>
     </div>
   </div>
 </template>
@@ -29,9 +32,11 @@ const connectionStore = useConnectionStore()
 const inputName = ref('')
 const error = ref('')
 
-const show = computed(() => !connectionStore.nicknameSet)
+const show = computed(() => connectionStore.nicknameHydrated && !connectionStore.nicknameSet)
 
-const submit = () => {
+const saving = ref(false)
+
+const submit = async () => {
   const name = inputName.value.trim()
 
   if (name.length < 3) {
@@ -49,8 +54,17 @@ const submit = () => {
     return
   }
 
-  connectionStore.setNickname(name)
+  saving.value = true
   error.value = ''
+  try {
+    // Se guarda en el vault de identidad; sin identidad no se puede continuar.
+    await connectionStore.setNickname(name)
+  } catch (e) {
+    error.value = 'No se pudo guardar en tu identidad. Reintenta.'
+    console.error('setNickname failed:', e)
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 

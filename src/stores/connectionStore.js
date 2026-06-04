@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getWebSocketProxyClient } from '@closerclick/closer-click-proxy-client'
+import { Identity } from '@closerclick/closer-click-identity'
 import { sanitizeNickname } from '../utils/sanitize'
 
 export const useConnectionStore = defineStore('connection', () => {
@@ -12,8 +13,14 @@ export const useConnectionStore = defineStore('connection', () => {
   const isConnected = ref(false)
   const connectionError = ref(null)
   const wsUrl = ref(import.meta.env.VITE_WS_URL || 'wss://proxy.closer.click')
-  const nickname = ref(sanitizeNickname(localStorage.getItem('chat_nickname') || ''))
+  // El nickname vive ÚNICAMENTE en el vault de identidad (id.closer.click). No
+  // hay copia paralela en localStorage: la identidad es la única fuente de
+  // verdad. Este ref es solo el espejo reactivo de `id.me.nickname`.
+  const nickname = ref('')
   const nicknameSet = computed(() => nickname.value.trim().length > 0)
+  // Mientras intentamos hidratar el nickname desde el vault no decidimos si
+  // mostrar el NicknameModal (evita el flash del modal en el primer frame).
+  const nicknameHydrated = ref(false)
 
   let handlersSetup = false
 
@@ -50,9 +57,31 @@ export const useConnectionStore = defineStore('connection', () => {
     token.value = null
   }
 
-  const setNickname = (name) => {
-    nickname.value = sanitizeNickname(name.trim())
-    localStorage.setItem('chat_nickname', nickname.value)
+  // Guarda el nickname en el vault de identidad (única fuente de verdad). El ref
+  // local se actualiza solo tras confirmar la escritura en el vault, para que no
+  // exista nunca un nick "de chat" desincronizado de la identidad. Lanza si el
+  // vault no está disponible: sin identidad no hay nickname.
+  const setNickname = async (name) => {
+    const clean = sanitizeNickname((name || '').trim())
+    if (!clean) throw new Error('Nickname vacío')
+    const id = await Identity.connect()
+    if (!id?.setMyNickname) throw new Error('Vault de identidad no disponible')
+    await id.setMyNickname(clean)
+    nickname.value = sanitizeNickname(id.me?.nickname || clean)
+  }
+
+  // Hidrata el nickname desde el vault al arrancar. La identidad es la ÚNICA
+  // fuente: si trae nickname lo reflejamos; si no, queda vacío y la app exigirá
+  // definirlo (NicknameModal) antes de cualquier acción.
+  const hydrateNicknameFromVault = async () => {
+    try {
+      const id = await Identity.connect()
+      nickname.value = sanitizeNickname(id?.me?.nickname || '')
+    } catch (e) {
+      console.warn('Vault no disponible para hidratar nickname:', e?.message || e)
+    } finally {
+      nicknameHydrated.value = true
+    }
   }
 
   const sendMessage = async (toTokens, rawMessage) => {
@@ -132,9 +161,11 @@ export const useConnectionStore = defineStore('connection', () => {
     wsUrl,
     nickname,
     nicknameSet,
+    nicknameHydrated,
     connect,
     disconnect,
     setNickname,
+    hydrateNicknameFromVault,
     sendMessage,
     wsProxyClient
   }

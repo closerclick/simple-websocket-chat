@@ -104,12 +104,13 @@ const saveNickname = async () => {
     nicknameStatus.value = 'Mínimo 3 caracteres'
     return
   }
-  connectionStore.setNickname(v)
   try {
-    const id = await Identity.connect()
-    await id.setMyNickname(v)
-  } catch (_) {}
-  nicknameStatus.value = 'Guardado'
+    // setNickname ya escribe en el vault de identidad (única fuente de verdad).
+    await connectionStore.setNickname(v)
+    nicknameStatus.value = 'Guardado'
+  } catch (_) {
+    nicknameStatus.value = 'No se pudo guardar en tu identidad'
+  }
   setTimeout(() => { nicknameStatus.value = '' }, 1500)
 }
 
@@ -158,8 +159,9 @@ const onImportFile = async (event) => {
     const result = await id.importIdentity(blob)
     myPubkey.value = result.me?.publickey || ''
     if (result.me?.nickname) {
+      // La identidad importada ya trae el nickname en el vault; solo reflejamos.
       nickname.value = result.me.nickname
-      connectionStore.setNickname(result.me.nickname)
+      await connectionStore.hydrateNicknameFromVault()
     }
     ioStatus.value = 'Identidad importada. Recarga la página para que todas las apps vean la nueva identidad.'
   } catch (e) {

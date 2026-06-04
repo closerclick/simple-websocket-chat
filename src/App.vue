@@ -40,6 +40,9 @@ watch(() => roomStore.isInRoom, (inRoom) => {
 })
 
 onMounted(async () => {
+  // Hidratar el nickname desde el vault ANTES de decidir si mostramos el
+  // NicknameModal: si ya tenés identidad con nickname, no te lo volvemos a pedir.
+  await connectionStore.hydrateNicknameFromVault()
   try {
     await connectionStore.connect()
   } catch (error) {
