@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { Identity } from '@closerclick/closer-click-identity'
 import { createVaultReputation } from '@closerclick/closer-click-reputation'
+import { createVaultProfileProvider } from '@closerclick/closer-click-profile'
 import { useConnectionStore } from './connectionStore'
 import { sanitizeMessage, sanitizeNickname } from '../utils/sanitize'
 import { loadHistory, persistMessage } from '../services/store'
@@ -32,6 +33,22 @@ async function getReputation () {
   if (!id) return null
   try { _reputation = createVaultReputation(id) } catch (_) { _reputation = null }
   return _reputation
+}
+
+// Provider para el Web Component compartido <closer-click-profile> (mismo del
+// ecosistema): datos del vault + reputación de la nube. Para "mi perfil" propio.
+let _profileProvider = null
+async function getProfileProvider () {
+  if (_profileProvider) return _profileProvider
+  const [id, rep] = await Promise.all([getIdentity(), getReputation()])
+  if (!id) return null
+  try { _profileProvider = createVaultProfileProvider({ identity: id, reputation: rep }) } catch (_) { _profileProvider = null }
+  return _profileProvider
+}
+// Mi pubkey del vault (para abrir mi propio perfil).
+async function getMyPubkey () {
+  const id = await getIdentity()
+  return id?.me?.publickey || null
 }
 
 export const useRoomStore = defineStore('room', () => {
@@ -924,6 +941,8 @@ export const useRoomStore = defineStore('room', () => {
     ratePeer,
     setPeerNickname,
     getReputation,
+    getProfileProvider,
+    getMyPubkey,
     refreshPeerInfo,
     refreshTrustMap,
     trustMap

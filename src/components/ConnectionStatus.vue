@@ -1,6 +1,7 @@
 <template>
   <div class="connection-status">
     <div class="status-left">
+      <closer-click-back class="cc-back"></closer-click-back>
       <h1>💬 Closer Click Chat</h1>
     </div>
 
@@ -34,6 +35,12 @@
         Reconnect
       </button>
 
+      <button class="profile-btn" data-testid="my-profile" @click="openMyProfile" title="Mi perfil" aria-label="Mi perfil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" />
+        </svg>
+      </button>
+
       <closer-click-support href="https://ko-fi.com/closerclick" repo="closerclick/simple-websocket-chat" discord="https://discord.gg/D648uq7cth"></closer-click-support>
     </div>
 
@@ -41,16 +48,59 @@
       :open="settingsOpen"
       @close="settingsOpen = false"
     />
+
+    <!-- Mi perfil (botón del header, a la izquierda de la moneda): mismo Web
+         Component compartido en modo self con mi identidad del vault. -->
+    <closer-click-profile
+      v-if="myProfilePk"
+      :ref="bindMyProfile"
+      modal
+      mode="self"
+      :style="profileTheme"
+      :pubkey="myProfilePk"
+      :name="connectionStore.nickname || ''"
+      @cc-profile-close="myProfilePk = null"
+    ></closer-click-profile>
   </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { useConnectionStore } from '../stores/connectionStore'
+import { useRoomStore } from '../stores/roomStore'
 import UserSettingsModal from './UserSettingsModal.vue'
+import '@closerclick/closer-click-profile'
+import { useBackLayer } from '@closerclick/closer-click-nav/vue'
 
 const connectionStore = useConnectionStore()
+const roomStore = useRoomStore()
 const settingsOpen = ref(false)
+
+// Volver unificado: el botón físico / chevron cierra el modal abierto antes de
+// salir hacia closer.click.
+useBackLayer(settingsOpen)
+
+// "Mi perfil": botón del header (a la izquierda de la moneda de soporte) que abre
+// el MISMO Web Component compartido en modo self con mi identidad del vault.
+const myProfilePk = ref(null)
+async function openMyProfile () {
+  const pk = await roomStore.getMyPubkey()
+  if (pk) myProfilePk.value = pk
+}
+function bindMyProfile (el) {
+  if (!el) return
+  roomStore.getProfileProvider().then((p) => { if (p) el.provider = p })
+}
+useBackLayer(myProfilePk, { onClose: () => { myProfilePk.value = null } })
+const profileTheme = {
+  '--ccp-bg': 'var(--color-card-bg)', '--ccp-bg-2': 'var(--color-surface)',
+  '--ccp-bg-3': 'var(--color-surface-variant)', '--ccp-bg-4': 'var(--color-border-light)',
+  '--ccp-border': 'var(--color-border)', '--ccp-text': 'var(--color-text)',
+  '--ccp-muted': 'var(--color-text-secondary)', '--ccp-accent': 'var(--color-primary)',
+  '--ccp-accent-2': 'var(--color-primary-dark)', '--ccp-derived': '#d49a00', '--ccp-gold': '#f5b301',
+  '--ccp-online': 'var(--color-success)', '--ccp-affinity': 'var(--color-secondary)',
+  '--ccp-input-bg': 'var(--color-background)', '--ccp-radius': '10px',
+}
 
 const statusText = computed(() => {
   if (connectionStore.isConnected) return 'Connected'
@@ -81,6 +131,8 @@ const reconnect = () => {
   flex-shrink: 0;
 }
 
+.status-left { display: flex; align-items: center; gap: 8px; }
+.status-left .cc-back { color: var(--color-text-on-primary, #fff); --cc-back-size: 34px; margin-left: -6px; }
 .status-left h1 {
   margin: 0;
   font-size: 1.5em;
@@ -155,6 +207,17 @@ const reconnect = () => {
 .nickname-button:hover {
   background: rgba(255, 255, 255, 0.25);
 }
+
+/* "Mi perfil": botón circular a la izquierda de la moneda de soporte. */
+.profile-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.12); color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%; cursor: pointer;
+  transition: background 0.2s;
+}
+.profile-btn svg { width: 18px; height: 18px; display: block; }
+.profile-btn:hover { background: rgba(255, 255, 255, 0.25); }
 
 .label {
   opacity: 0.9;
