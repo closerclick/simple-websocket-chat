@@ -19,15 +19,6 @@
       </div>
 
       <button
-        v-if="connectionStore.nickname"
-        class="nickname-button"
-        @click="settingsOpen = true"
-        title="Editar identidad"
-      >
-        @{{ connectionStore.nickname }}
-      </button>
-
-      <button
         v-if="!connectionStore.isConnected"
         @click="reconnect"
         class="small"
@@ -43,11 +34,6 @@
 
       <closer-click-support href="https://ko-fi.com/closerclick" repo="closerclick/simple-websocket-chat" discord="https://discord.gg/D648uq7cth"></closer-click-support>
     </div>
-
-    <UserSettingsModal
-      :open="settingsOpen"
-      @close="settingsOpen = false"
-    />
 
     <!-- Mi perfil (botón del header, a la izquierda de la moneda): mismo Web
          Component compartido en modo self con mi identidad del vault. -->
@@ -68,17 +54,11 @@
 import { computed, ref } from 'vue'
 import { useConnectionStore } from '../stores/connectionStore'
 import { useRoomStore } from '../stores/roomStore'
-import UserSettingsModal from './UserSettingsModal.vue'
 import '@closerclick/closer-click-profile'
 import { useBackLayer } from '@closerclick/closer-click-nav/vue'
 
 const connectionStore = useConnectionStore()
 const roomStore = useRoomStore()
-const settingsOpen = ref(false)
-
-// Volver unificado: el botón físico / chevron cierra el modal abierto antes de
-// salir hacia closer.click.
-useBackLayer(settingsOpen)
 
 // "Mi perfil": botón del header (a la izquierda de la moneda de soporte) que abre
 // el MISMO Web Component compartido en modo self con mi identidad del vault.
@@ -192,20 +172,6 @@ const reconnect = () => {
   align-items: center;
   gap: var(--spacing-sm);
   font-size: 0.9em;
-}
-
-.nickname-button {
-  background: rgba(255, 255, 255, 0.12);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--border-radius-sm);
-  padding: 0.3em 0.7em;
-  font-size: 0.9em;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.nickname-button:hover {
-  background: rgba(255, 255, 255, 0.25);
 }
 
 /* "Mi perfil": botón circular a la izquierda de la moneda de soporte. */
