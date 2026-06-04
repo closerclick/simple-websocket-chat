@@ -76,7 +76,26 @@ export const useConnectionStore = defineStore('connection', () => {
   const hydrateNicknameFromVault = async () => {
     try {
       const id = await Identity.connect()
-      nickname.value = sanitizeNickname(id?.me?.nickname || '')
+      let vaultNick = sanitizeNickname(id?.me?.nickname || '')
+      if (!vaultNick) {
+        // Migración única: el chat viejo guardaba el nick solo en
+        // localStorage('chat_nickname'), nunca en el vault. Si existe ese nick
+        // legado y el vault no lo tiene, lo subimos al vault (única fuente) y
+        // borramos la copia local — así los usuarios existentes no tienen que
+        // volver a teclearlo. Si el vault no responde, dejamos el legado para
+        // reintentar en el próximo arranque.
+        const legacy = sanitizeNickname(localStorage.getItem('chat_nickname') || '')
+        if (legacy && id?.setMyNickname) {
+          try {
+            await id.setMyNickname(legacy)
+            vaultNick = sanitizeNickname(id.me?.nickname || legacy)
+            localStorage.removeItem('chat_nickname')
+          } catch (e) {
+            console.warn('Migración de nick legado al vault falló (reintenta luego):', e?.message || e)
+          }
+        }
+      }
+      nickname.value = vaultNick
     } catch (e) {
       console.warn('Vault no disponible para hidratar nickname:', e?.message || e)
     } finally {
